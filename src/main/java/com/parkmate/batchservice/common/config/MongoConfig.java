@@ -7,9 +7,12 @@ import com.mongodb.client.MongoClients;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+
 import java.util.concurrent.TimeUnit;
 
 @Configuration
+@EnableMongoRepositories(basePackages = "com.parkmate.batchservice.reviewsummary.infrastructure.repository")
 public class MongoConfig {
 
     @Bean
