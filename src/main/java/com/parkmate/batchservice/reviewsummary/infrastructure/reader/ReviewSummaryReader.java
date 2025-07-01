@@ -20,8 +20,15 @@ public class ReviewSummaryReader implements ItemReader<ReviewCreatedJoinUserEven
     public ReviewCreatedJoinUserEvent read() {
         if (iterator == null || !iterator.hasNext()) {
             List<ReviewCreatedJoinUserEvent> events = reviewChunkBuffer.drain();
-            iterator = events.iterator();
+
+            // ✅ 버퍼가 비었을 경우도 명시적으로 empty iterator 할당
+            if (events.isEmpty()) {
+                iterator = List.<ReviewCreatedJoinUserEvent>of().iterator();
+            } else {
+                iterator = events.iterator();
+            }
         }
+
         return iterator.hasNext() ? iterator.next() : null;
     }
 }

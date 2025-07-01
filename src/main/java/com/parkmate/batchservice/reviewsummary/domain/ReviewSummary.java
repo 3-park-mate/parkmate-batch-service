@@ -1,35 +1,44 @@
 package com.parkmate.batchservice.reviewsummary.domain;
 
+import com.parkmate.batchservice.common.entity.BaseEntity;
+import jakarta.persistence.*;
 import lombok.AccessLevel;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import java.time.LocalDateTime;
+import org.hibernate.annotations.Comment;
+import jakarta.persistence.Id;
 
-@Document(collection = "reviewsummary")
+@Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class ReviewSummary {
+@Table(name = "review_summary")
+public class ReviewSummary extends BaseEntity {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Comment("주차장 UUID")
+    @Column(nullable = false, unique = true, length = 36)
     private String parkingLotUuid;
 
+    @Comment("리뷰 평균 평점")
+    @Column(nullable = false)
     private double averageRating;
+
+    @Comment("총 리뷰 수")
+    @Column(nullable = false)
     private long totalReviews;
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
 
     @Builder
     private ReviewSummary(String parkingLotUuid,
-                         double averageRating,
-                         long totalReviews) {
+                          double averageRating,
+                          long totalReviews) {
+
         this.parkingLotUuid = parkingLotUuid;
         this.averageRating = averageRating;
         this.totalReviews = totalReviews;
-        this.createdAt = LocalDateTime.now();
-        this.updatedAt = LocalDateTime.now();
     }
 
     public static ReviewSummary of(String parkingLotUuid,
@@ -43,9 +52,7 @@ public class ReviewSummary {
     }
 
     public void update(double averageRating, long totalReviews) {
-
         this.averageRating = averageRating;
         this.totalReviews = totalReviews;
-        this.updatedAt = LocalDateTime.now();
     }
 }
