@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -16,25 +17,27 @@ public class ReviewSummaryWriter implements ItemWriter<ReviewSummary> {
     private final ReviewSummaryRepository reviewSummaryRepository;
 
     @Override
+    @Transactional
     public void write(Chunk<? extends ReviewSummary> items) {
         for (ReviewSummary newSummary : items) {
-            ReviewSummary existingSummary = reviewSummaryRepository.findById(newSummary.getParkingLotUuid())
-                    .orElse(null);
+            reviewSummaryRepository.findByParkingLotUuid(newSummary.getParkingLotUuid())
+                    .ifPresentOrElse(
+                            existing -> {
+                                long totalReviews = existing.getTotalReviews() + newSummary.getTotalReviews();
+                                double totalRatingSum =
+                                        existing.getAverageRating() * existing.getTotalReviews() +
+                                                newSummary.getAverageRating() * newSummary.getTotalReviews();
 
-            if (existingSummary != null) {
-                long totalReviews = existingSummary.getTotalReviews() + newSummary.getTotalReviews();
+                                double averageRating = totalReviews > 0 ? totalRatingSum / totalReviews : 0.0;
+                                existing.update(averageRating, totalReviews);
 
-                double totalRatingSum = existingSummary.getAverageRating() * existingSummary.getTotalReviews()
-                        + newSummary.getAverageRating() * newSummary.getTotalReviews();
-
-                double averageRating = totalReviews > 0 ? totalRatingSum / totalReviews : 0.0;
-
-                existingSummary.update(averageRating, totalReviews);
-
-                reviewSummaryRepository.save(existingSummary);
-            } else {
-                reviewSummaryRepository.save(newSummary);
-            }
+                                // ✅ 명시적 save (영속성 보장)
+                                reviewSummaryRepository.save(existing);
+                            },
+                            () -> {
+                                reviewSummaryRepository.save(newSummary);
+                            }
+                    );
         }
     }
 }
