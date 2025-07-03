@@ -35,7 +35,7 @@ public class SwaggerConfig {
     private Info apiInfo() {
         return new Info()
                 .title("BATCH-SERVICE API DOCS")
-                .description("batchservice API 테스트를 위한 Swagger UI")
+                .description("batch-service API 테스트를 위한 Swagger UI")
                 .version("1.0.0");
     }
 }
