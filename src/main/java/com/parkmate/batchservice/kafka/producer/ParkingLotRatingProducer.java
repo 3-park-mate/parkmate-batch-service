@@ -15,9 +15,12 @@ public class ParkingLotRatingProducer {
     private static final String TOPIC = "batch.review-summary.updated";
 
     public void sendRatingUpdate(String parkingLotUuid, double averageRating) {
+
+        double roundedRating = Math.round(averageRating * 10.0) / 10.0;
+
         ParkingLotRatingUpdatedEvent event = ParkingLotRatingUpdatedEvent.builder()
                 .parkingLotUuid(parkingLotUuid)
-                .averageRating(averageRating)
+                .averageRating(roundedRating)
                 .build();
 
         kafkaTemplate.send(TOPIC, parkingLotUuid, event);
