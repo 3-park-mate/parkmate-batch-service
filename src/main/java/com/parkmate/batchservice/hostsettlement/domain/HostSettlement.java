@@ -29,7 +29,7 @@ public class HostSettlement extends BaseEntity {
     private String parkingLotUuid;
 
     @Comment("정산 기준 일자")
-    @Column(nullable = false)
+    @Column(name = "settlement_date",nullable = false)
     private LocalDate settlementDate;
 
     @Comment("총 매출 금액")

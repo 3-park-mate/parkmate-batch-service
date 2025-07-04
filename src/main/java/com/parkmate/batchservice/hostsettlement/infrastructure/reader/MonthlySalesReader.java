@@ -73,6 +73,8 @@ public class MonthlySalesReader implements ItemReader<HostSettlement> {
 
         BigDecimal totalAmount = payments.stream()
                 .map(SettlementPaymentResponseDto::getAmount)
+                .filter(amount -> amount != null)
+                .map(BigDecimal::valueOf)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         return HostSettlement.builder()

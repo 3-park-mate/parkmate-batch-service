@@ -39,6 +39,7 @@ public class DailySalesReader implements ItemReader<HostSettlement> {
 
         log.info("📦 [DailySalesReader] 정산 데이터 조회: host={}, lot={}, date={}", hostUuid, parkingLotUuid, targetDate);
 
+
         List<SettlementPaymentResponseDto> payments;
         try {
             payments = paymentFeignClient.getSettlementPayments(
@@ -47,6 +48,17 @@ public class DailySalesReader implements ItemReader<HostSettlement> {
                     targetDate.toString(),
                     targetDate.toString()
             );
+
+            log.info("✅ [DailySalesReader] 조회된 결제 건수: {}", payments.size());
+            for (SettlementPaymentResponseDto p : payments) {
+                log.info("📄 결제 데이터 - host: {}, lot: {}, amount: {}, date: {}",
+                        p.getHostUuid(),
+                        p.getParkingLotUuid(),
+                        p.getAmount(),
+                        p.getPaymentDate());
+
+            }
+
         } catch (Exception e) {
             log.error("❌ [DailySalesReader] 결제 서비스 호출 실패: {}", e.getMessage(), e);
             return null;
@@ -58,8 +70,12 @@ public class DailySalesReader implements ItemReader<HostSettlement> {
         }
 
         BigDecimal totalAmount = payments.stream()
-                .map(SettlementPaymentResponseDto::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+                .map(SettlementPaymentResponseDto::getAmount) // Long
+                .filter(amount -> amount != null)              // null 체크
+                .map(BigDecimal::valueOf)                      // Long → BigDecimal
+                .reduce(BigDecimal.ZERO, BigDecimal::add);     // 합계 계산
+
+        log.info("💰 [DailySalesReader] 계산된 총 정산 금액: {}", totalAmount);
 
         return HostSettlement.builder()
                 .hostUuid(hostUuid)
