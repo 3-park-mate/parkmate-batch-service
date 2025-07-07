@@ -3,7 +3,6 @@ package com.parkmate.batchservice.hostsettlement.infrastructure.scheduler;
 import com.parkmate.batchservice.hostsettlement.application.HostSettlementService;
 import com.parkmate.batchservice.hostsettlement.domain.SettlementCycle;
 import com.parkmate.batchservice.hostsettlement.dto.request.HostParkingLotDto;
-import com.parkmate.batchservice.hostsettlement.infrastructure.repository.HostSettlementRepository;
 import com.parkmate.batchservice.kafka.buffer.ReservationChunkBuffer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
