@@ -1,38 +1,34 @@
 package com.parkmate.batchservice.hostsettlement.infrastructure.writer;
 
-import com.parkmate.batchservice.hostsettlement.domain.HostSettlement;
-import com.parkmate.batchservice.hostsettlement.infrastructure.repository.HostSettlementRepository;
+import com.parkmate.batchservice.hostsettlement.domain.DailySettlement;
+import com.parkmate.batchservice.hostsettlement.infrastructure.repository.DailySettlementRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.item.Chunk;
 import org.springframework.batch.item.ItemWriter;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
-public class DailySalesWriter implements ItemWriter<HostSettlement> {
-
-    private final HostSettlementRepository repository;
+public class DailySalesWriter implements ItemWriter<DailySettlement> {
+    private final DailySettlementRepository dailySettlementRepository;
 
     @Override
-    public void write(Chunk<? extends HostSettlement> chunk) {
+    public void write(Chunk<? extends DailySettlement> chunk) {
         if (chunk.isEmpty()) {
-            log.info("💤 [Writer] 정산 항목 없음 - 저장 생략");
+            log.info("📦 [DailySalesWriter] 저장할 일매출 데이터가 없습니다.");
             return;
         }
-
-        try {
-            repository.saveAll(chunk.getItems());
-            log.info("✅ [Writer] 정산 저장 완료 - {}건", chunk.size());
-
-            chunk.getItems().forEach(settlement ->
-                    log.debug("📌 저장 완료: host={}, lot={}, date={}, amount={}",
-                            settlement.getHostUuid(),
-                            settlement.getParkingLotUuid(),
-                            settlement.getSettlementDate(),
-                            settlement.getTotalSalesAmount()));
-        } catch (Exception e) {
-            log.error("❌ [Writer] 정산 저장 실패: {}", e.getMessage(), e);
-            throw e;
+        List<? extends DailySettlement> settlements = chunk.getItems();
+        List<DailySettlement> newSettlements = settlements.stream()
+                .filter(s -> !dailySettlementRepository.existsByReservationCode(s.getReservationCode()))
+                .collect(Collectors.toList());
+        if (newSettlements.isEmpty()) {
+            log.info("⚠️ [DailySalesWriter] 모두 중복 reservationCode, 저장 생략");
+            return;
         }
+        dailySettlementRepository.saveAll(newSettlements);
+        log.info("✅ [DailySalesWriter] 일매출 저장 완료 - {}건", newSettlements.size());
     }
 }

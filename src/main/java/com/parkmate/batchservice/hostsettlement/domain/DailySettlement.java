@@ -13,12 +13,16 @@ import java.time.LocalDate;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(name = "host_settlement")
-public class HostSettlement extends BaseEntity {
+@Table(name = "daily_settlement")
+public class DailySettlement extends BaseEntity {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Comment("예약 코드")
+    @Column(nullable = false, unique = true, length = 100)
+    private String reservationCode;
 
     @Comment("호스트 UUID")
     @Column(nullable = false, length = 36)
@@ -28,35 +32,37 @@ public class HostSettlement extends BaseEntity {
     @Column(nullable = false, length = 36)
     private String parkingLotUuid;
 
-    @Comment("정산 기준 일자")
-    @Column(name = "settlement_date",nullable = false)
+    @Comment("정산 일자")
+    @Column(nullable = false)
     private LocalDate settlementDate;
 
-    @Comment("총 매출 금액")
+    @Comment("매출 금액")
     @Column(nullable = false, precision = 15, scale = 2)
-    private BigDecimal totalSalesAmount;
+    private BigDecimal amount;
 
-    @Comment("정산 상태 (예: PENDING, COMPLETED)")
+    @Comment("정산 상태")
     @Column(nullable = false, length = 20)
     private String status;
 
-    @Comment("정산 주기 (FIFTEEN: 15일마다, THIRTY: 30일마다)")
+    @Comment("정산 주기")
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     private SettlementCycle settlementCycle;
 
     @Builder
-    private HostSettlement(String hostUuid,
-                           String parkingLotUuid,
-                           LocalDate settlementDate,
-                           BigDecimal totalSalesAmount,
-                           String status,
-                           SettlementCycle settlementCycle) {
+    private DailySettlement(String reservationCode,
+                            String hostUuid,
+                            String parkingLotUuid,
+                            LocalDate settlementDate,
+                            BigDecimal amount,
+                            String status,
+                            SettlementCycle settlementCycle) {
+        this.reservationCode = reservationCode;
         this.hostUuid = hostUuid;
         this.parkingLotUuid = parkingLotUuid;
         this.settlementDate = settlementDate;
-        this.totalSalesAmount = totalSalesAmount;
+        this.amount = amount;
         this.status = status;
         this.settlementCycle = settlementCycle;
     }
-}
+} 

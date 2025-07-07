@@ -21,44 +21,26 @@ public class DailySalesScheduler {
 
     private final JobLauncher jobLauncher;
     private final Job dailySalesJob;
-    private final HostSettlementService hostSettlementService;
 
-    /**
-     * 매일 자정 실행 (전일 매출 정산)
-     */
-    //@Scheduled(cron = "0 0 0 * * *") // 운영용
-    @Scheduled(cron = "0 */1 * * * *") // 테스트용: 매분 실행
+    //@Scheduled(cron = "0 0 0 * * *") // 운영
+    @Scheduled(cron = "0 */1 * * * *") // 테스트
     public void executeDailySettlementJob() {
-        LocalDate targetDate = LocalDate.now().minusDays(1);
-        log.info("🚀 [일 정산 스케줄러] 시작 - 대상 날짜: {}", targetDate);
+        LocalDate today = LocalDate.now();
 
-        List<HostParkingLotDto> targets = hostSettlementService.getAllHostParkingLotPairsFromPayment(targetDate);
+        log.info("🚀 [Scheduler] 일 매출 정산 Job 시작 - 대상일자: {}", today);
 
-        if (targets.isEmpty()) {
-            log.info("📭 [일 정산 스케줄러] 대상 없음 - {}", targetDate);
-            return;
+        try {
+            JobParameters params = new JobParametersBuilder()
+                    .addString("jobDate", today.toString()) // 날짜 추가
+                    .addLong("run.id", System.currentTimeMillis()) // 중복 방지용
+                    .toJobParameters();
+
+            jobLauncher.run(dailySalesJob, params);
+            log.info("✅ [Scheduler] 일 매출 정산 Job 실행 성공 - 대상일자: {}", today);
+        } catch (Exception e) {
+            log.error("❌ [Scheduler] 일 매출 정산 Job 실행 실패 - 대상일자: {}, 에러: {}", today, e.getMessage(), e);
         }
 
-        for (HostParkingLotDto pair : targets) {
-            JobParameters params = buildJobParameters(pair.getHostUuid(), pair.getParkingLotUuid(), targetDate);
-            try {
-                jobLauncher.run(dailySalesJob, params);
-                log.info("✅ [정산 성공] host={}, lot={}, date={}", pair.getHostUuid(), pair.getParkingLotUuid(), targetDate);
-            } catch (Exception e) {
-                log.error("❌ [정산 실패] host={}, lot={}, date={}, error={}",
-                        pair.getHostUuid(), pair.getParkingLotUuid(), targetDate, e.getMessage(), e);
-            }
-        }
-
-        log.info("🏁 [일 정산 스케줄러] 종료");
-    }
-
-    private JobParameters buildJobParameters(String hostUuid, String parkingLotUuid, LocalDate targetDate) {
-        return new JobParametersBuilder()
-                .addString("hostUuid", hostUuid)
-                .addString("parkingLotUuid", parkingLotUuid)
-                .addString("targetDate", targetDate.toString())
-                .addLong("run.id", System.currentTimeMillis())
-                .toJobParameters();
+        log.info("🏁 [Scheduler] 일 매출 정산 Job 종료 - 대상일자: {}", today);
     }
 }

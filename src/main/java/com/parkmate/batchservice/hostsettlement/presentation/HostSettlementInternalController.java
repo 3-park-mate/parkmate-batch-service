@@ -35,4 +35,4 @@ public class HostSettlementInternalController {
     ) {
         return hostSettlementService.getMonthlySales(hostUuid, parkingLotUuid, year, month, cycle);
     }
-}
+} 
