@@ -1,89 +1,37 @@
 package com.parkmate.batchservice.hostsettlement.infrastructure.reader;
 
-import com.parkmate.batchservice.hostsettlement.domain.HostSettlement;
+import com.parkmate.batchservice.hostsettlement.domain.DailySettlement;
 import com.parkmate.batchservice.hostsettlement.domain.SettlementCycle;
-import com.parkmate.batchservice.hostsettlement.dto.response.feignforpayment.SettlementPaymentResponseDto;
-import com.parkmate.batchservice.hostsettlement.infrastructure.client.PaymentFeignClient;
+import com.parkmate.batchservice.hostsettlement.infrastructure.repository.DailySettlementRepository;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.batch.core.configuration.annotation.StepScope;
 import org.springframework.batch.item.ItemReader;
-import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.time.YearMonth;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Slf4j
-@StepScope
-public class MonthlySalesReader implements ItemReader<HostSettlement> {
+public class MonthlySalesReader implements ItemReader<List<DailySettlement>> {
+    private final Iterator<List<DailySettlement>> iterator;
 
-    private final PaymentFeignClient paymentFeignClient;
-    private final String hostUuid;
-    private final String parkingLotUuid;
-    private final YearMonth yearMonth;
-    private final SettlementCycle settlementCycle;
-
-    private boolean read = false;
-
-    public MonthlySalesReader(PaymentFeignClient paymentFeignClient,
-                              String hostUuid,
-                              String parkingLotUuid,
-                              int year,
-                              int month,
-                              SettlementCycle settlementCycle) {
-        this.paymentFeignClient = paymentFeignClient;
-        this.hostUuid = hostUuid;
-        this.parkingLotUuid = parkingLotUuid;
-        this.yearMonth = YearMonth.of(year, month);
-        this.settlementCycle = settlementCycle;
+    public MonthlySalesReader(DailySettlementRepository repository, String hostUuid, String parkingLotUuid, LocalDate startDate, LocalDate endDate, SettlementCycle cycle) {
+        log.info("[월매출 집계 파라미터] hostUuid={}, parkingLotUuid={}, 기간=[{}~{}], cycle={}", hostUuid, parkingLotUuid, startDate, endDate, cycle);
+        List<DailySettlement> settlements = repository.findByHostUuidAndParkingLotUuidAndSettlementDateBetweenAndSettlementCycle(
+                hostUuid, parkingLotUuid, startDate, endDate, SettlementCycle.DAILY
+        );
+        Map<String, List<DailySettlement>> grouped = settlements.stream()
+                .collect(Collectors.groupingBy(s -> s.getHostUuid() + "-" + s.getParkingLotUuid()));
+        this.iterator = grouped.values().iterator();
+        log.info("✅ [MonthlySalesReader] 월매출 집계 기간 [{} ~ {}] 그룹 수: {}", startDate, endDate, grouped.size());
     }
 
     @Override
-    public HostSettlement read() {
-        if (read) return null;
-        read = true;
-
-        LocalDate startDate = settlementCycle == SettlementCycle.FIFTEEN
-                ? yearMonth.atDay(1)
-                : yearMonth.atDay(16);
-
-        LocalDate endDate = settlementCycle == SettlementCycle.FIFTEEN
-                ? yearMonth.atDay(15)
-                : yearMonth.atEndOfMonth();
-
-        log.info("📦 [MonthlySalesReader] 조회 조건 - host={}, lot={}, start={}, end={}, cycle={}",
-                hostUuid, parkingLotUuid, startDate, endDate, settlementCycle.name());
-
-        List<SettlementPaymentResponseDto> payments;
-        try {
-            payments = paymentFeignClient.getSettlementPayments(
-                    hostUuid,
-                    parkingLotUuid,
-                    startDate.toString(),
-                    endDate.toString()
-            );
-        } catch (Exception e) {
-            log.error("❌ [MonthlySalesReader] 결제 서비스 호출 실패: {}", e.getMessage(), e);
+    public List<DailySettlement> read() {
+        if (iterator.hasNext()) {
+            return iterator.next();
+        } else {
             return null;
         }
-
-        if (payments.isEmpty()) {
-            log.info("ℹ️ [MonthlySalesReader] 해당 기간 결제 내역 없음: {} ~ {}", startDate, endDate);
-            return null;
-        }
-
-        BigDecimal totalAmount = payments.stream()
-                .map(SettlementPaymentResponseDto::getAmount)
-                .filter(amount -> amount != null)
-                .map(BigDecimal::valueOf)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-
-        return HostSettlement.builder()
-                .hostUuid(hostUuid)
-                .parkingLotUuid(parkingLotUuid)
-                .settlementDate(endDate)
-                .totalSalesAmount(totalAmount)
-                .status("COMPLETED")
-                .settlementCycle(settlementCycle)
-                .build();
     }
 }

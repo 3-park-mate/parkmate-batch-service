@@ -1,28 +1,12 @@
 package com.parkmate.batchservice.hostsettlement.infrastructure.processor;
 
-import com.parkmate.batchservice.hostsettlement.domain.HostSettlement;
-import com.parkmate.batchservice.hostsettlement.domain.SettlementCycle;
-import com.parkmate.batchservice.hostsettlement.dto.response.feignforpayment.SettlementPaymentResponseDto;
+import com.parkmate.batchservice.hostsettlement.domain.DailySettlement;
 import org.springframework.batch.item.ItemProcessor;
 
-import java.math.BigDecimal;
-
-public class DailySalesProcessor implements ItemProcessor<SettlementPaymentResponseDto, HostSettlement> {
-
+public class DailySalesProcessor implements ItemProcessor<DailySettlement, DailySettlement> {
     @Override
-    public HostSettlement process(SettlementPaymentResponseDto dto) {
-
-        BigDecimal amount = dto.getAmount() != null
-                ? BigDecimal.valueOf(dto.getAmount())
-                : BigDecimal.ZERO; // null 방어 로직
-
-        return HostSettlement.builder()
-                .hostUuid(dto.getHostUuid())
-                .parkingLotUuid(dto.getParkingLotUuid())
-                .settlementDate(dto.getPaymentDate().toLocalDate())
-                .totalSalesAmount(amount)
-                .status("COMPLETED")
-                .settlementCycle(SettlementCycle.DAILY)
-                .build();
+    public DailySettlement process(DailySettlement item) {
+        // 이미 DailySettlement로 저장된 데이터이므로 추가 가공 없이 그대로 반환
+        return item;
     }
 }

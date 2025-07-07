@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.config.EnableJpaAuditing;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 @EnableJpaAuditing
-@EnableFeignClients(basePackages = "com.parkmate.batchservice.hostsettlement.infrastructure.client")
+@EnableFeignClients(basePackages = "com.parkmate.batchservice.hostsettlement.infrastructure.feignclient")
 @EnableBatchProcessing
 @EnableScheduling
 @EnableDiscoveryClient

@@ -1,5 +1,6 @@
 package com.parkmate.batchservice.kafka.config;
 
+import com.parkmate.batchservice.kafka.event.ReservationEvent;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.support.serializer.JsonDeserializer;
 import com.parkmate.batchservice.kafka.event.ReviewCreatedJoinUserEvent;
@@ -45,6 +46,30 @@ public class KafkaConsumerConfig {
         ConcurrentKafkaListenerContainerFactory<String, ReviewCreatedJoinUserEvent> factory =
                 new ConcurrentKafkaListenerContainerFactory<>();
         factory.setConsumerFactory(reviewConsumerFactory());
+        return factory;
+    }
+
+    @Bean
+    public ConsumerFactory<String, ReservationEvent> reservationConsumerFactory() {
+        JsonDeserializer<ReservationEvent> valueDeserializer = new JsonDeserializer<>(ReservationEvent.class);
+        valueDeserializer.addTrustedPackages("*");
+        valueDeserializer.setRemoveTypeHeaders(false);
+        valueDeserializer.setUseTypeMapperForKey(true);
+
+        Map<String, Object> props = new HashMap<>();
+        props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, bootstrapServers);
+        props.put(ConsumerConfig.GROUP_ID_CONFIG, "reservation-create-group");
+        props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
+        props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, JsonDeserializer.class);
+
+        return new DefaultKafkaConsumerFactory<>(props, new StringDeserializer(), valueDeserializer);
+    }
+
+    @Bean
+    public ConcurrentKafkaListenerContainerFactory<String, ReservationEvent> reservationKafkaListenerContainerFactory() {
+        ConcurrentKafkaListenerContainerFactory<String, ReservationEvent> factory =
+                new ConcurrentKafkaListenerContainerFactory<>();
+        factory.setConsumerFactory(reservationConsumerFactory());
         return factory;
     }
 }
