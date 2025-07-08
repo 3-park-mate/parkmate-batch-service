@@ -10,10 +10,12 @@ public class ParkingLotRatingUpdatedEvent {
 
     private String parkingLotUuid;
     private double averageRating;
+    private long totalReview; // 리뷰 갯수 필드 추가
 
     @Builder
-    private ParkingLotRatingUpdatedEvent(String parkingLotUuid, double averageRating) {
+    private ParkingLotRatingUpdatedEvent(String parkingLotUuid, double averageRating, long totalReview) {
         this.parkingLotUuid = parkingLotUuid;
         this.averageRating = averageRating;
+        this.totalReview = totalReview;
     }
 }
