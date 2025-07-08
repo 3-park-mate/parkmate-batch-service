@@ -7,6 +7,8 @@ import com.parkmate.batchservice.hostsettlement.dto.response.feignforhost.Monthl
 import com.parkmate.batchservice.kafka.buffer.ReservationChunkBuffer;
 import com.parkmate.batchservice.kafka.event.ReservationEvent;
 import com.parkmate.batchservice.hostsettlement.dto.response.DailySalesSummaryDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotSalesSummaryDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotWeeklySalesDto;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -39,4 +41,20 @@ public interface  HostSettlementService {
      * 일매출 합산 조회 (날짜+호스트+주차장별)
      */
     List<DailySalesSummaryDto> getDailySalesSummary(LocalDate startDate, LocalDate endDate);
+
+    List<ParkingLotSalesSummaryDto> getParkingLotSalesSummary(String hostUuid, int year, int month, Integer week);
+
+    List<ParkingLotWeeklySalesDto> getWeeklySalesAll(String hostUuid, int year, int week);
+
+    List<ParkingLotWeeklySalesDto> getParkingLotsWeeklySalesByRange(String hostUuid, String startDate, String endDate);
+    
+    /**
+     * 특정 주차장의 합산된 일매출 조회 (주별)
+     */
+    List<DailySalesResponseDto> getWeeklySalesByParkingLot(String hostUuid, String parkingLotUuid, int year, int week);
+    
+    /**
+     * 특정 주차장의 합산된 일매출 조회 (날짜 범위)
+     */
+    List<DailySalesResponseDto> getWeeklySalesByParkingLotAndRange(String hostUuid, String parkingLotUuid, String startDate, String endDate);
 }

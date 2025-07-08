@@ -25,8 +25,8 @@ public class MonthlySalesScheduler {
     private final Job monthlySalesJob;
     private final HostSettlementService hostSettlementService;
 
-    // 테스트용 1분마다 실행
-    @Scheduled(cron = "0 */1 * * * *")
+    //@Scheduled(cron = "0 0 0 * * *") // 매일 자정에 실행
+    @Scheduled(cron = "0 */5 * * * *") // 5분마다 실행
     public void triggerAllMonthlyJobs() {
         log.info("🚀 [정산 스케줄러] 월 정산 스케줄 시작");
         runMidMonthJob();
