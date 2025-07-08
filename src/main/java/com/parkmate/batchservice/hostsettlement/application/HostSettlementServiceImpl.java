@@ -8,9 +8,13 @@ import com.parkmate.batchservice.hostsettlement.dto.request.HostParkingLotDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.feignforhost.DailySalesResponseDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.feignforhost.MonthlySalesResponseDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.DailySalesSummaryDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotSalesSummaryDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotWeeklySalesDto;
 import com.parkmate.batchservice.hostsettlement.infrastructure.repository.DailySettlementRepository;
 import com.parkmate.batchservice.hostsettlement.infrastructure.repository.MonthlySettlementRepository;
+import com.parkmate.batchservice.hostsettlement.vo.response.ParkingLotInfoResponseVo;
 import com.parkmate.batchservice.kafka.event.ReservationEvent;
+import com.parkmate.batchservice.hostsettlement.infrastructure.feignclient.ParkingLotInternalClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -20,6 +24,9 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.Comparator;
+import com.parkmate.batchservice.common.response.ApiResponse;
 
 @Slf4j
 @Service
@@ -28,6 +35,7 @@ public class HostSettlementServiceImpl implements HostSettlementService {
 
     private final DailySettlementRepository dailySettlementRepository;
     private final MonthlySettlementRepository monthlySettlementRepository;
+    private final ParkingLotInternalClient parkingLotInternalClient;
 
     /**
      * ✅ 일 정산 처리 (Kafka Consumer를 통한 실시간 정산)
@@ -109,5 +117,125 @@ public class HostSettlementServiceImpl implements HostSettlementService {
     @Override
     public List<DailySalesSummaryDto> getDailySalesSummary(LocalDate startDate, LocalDate endDate) {
         return dailySettlementRepository.findDailySalesSummary(startDate, endDate);
+    }
+
+    @Override
+    public List<ParkingLotSalesSummaryDto> getParkingLotSalesSummary(String hostUuid, int year, int month, Integer week) {
+        // 1. hostUuid가 관리하는 모든 주차장 UUID 리스트 조회 (일매출 테이블에서 distinct 추출)
+        List<String> parkingLotUuids = dailySettlementRepository.findDistinctParkingLotUuidsByHostUuid(hostUuid);
+        List<ParkingLotSalesSummaryDto> result = new ArrayList<>();
+        for (String lotUuid : parkingLotUuids) {
+            // 주차장명 조회
+            String parkingLotName = "";
+            try {
+                ParkingLotInfoResponseVo info = parkingLotInternalClient.getParkingLotInfo(lotUuid);
+                parkingLotName = info != null ? info.getParkingLotName() : "";
+            } catch (Exception e) {
+                parkingLotName = "";
+            }
+            // 월매출 합계
+            int monthlySales = dailySettlementRepository.sumMonthlySales(hostUuid, lotUuid, year, month);
+            // 주매출 합계 (week가 null이면 0)
+            int weeklySales = (week != null) ? dailySettlementRepository.sumWeeklySales(hostUuid, lotUuid, year, week) : 0;
+            result.add(new ParkingLotSalesSummaryDto(lotUuid, parkingLotName, monthlySales, weeklySales));
+        }
+        return result;
+    }
+
+    @Override
+    public List<ParkingLotWeeklySalesDto> getWeeklySalesAll(String hostUuid, int year, int week) {
+        // 1. getParkingLotSalesSummary로 주차장 목록 및 기본정보 조회
+        ApiResponse<List<ParkingLotSalesSummaryDto>> response = parkingLotInternalClient.getParkingLotSalesSummary(hostUuid, year, 0, week);
+        List<ParkingLotSalesSummaryDto> summaryList = response.getData(); // 실제 메서드명(getData/getResult 등) 확인 필요
+        List<ParkingLotWeeklySalesDto> result = new ArrayList<>();
+        if (summaryList != null) {
+            for (ParkingLotSalesSummaryDto summary : summaryList) {
+                String parkingLotUuid = summary.getParkingLotUuid();
+                String parkingLotName = summary.getParkingLotName();
+                // 2. 각 주차장별 주별 일매출 조회
+                List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndYearWeek(
+                    parkingLotUuid, year, week
+                );
+                // 3. 일매출 합산 로직
+                List<DailySalesResponseDto> aggregatedSales = aggregateDailySales(dailySales);
+                // 4. DTO 생성
+                ParkingLotWeeklySalesDto dto = new ParkingLotWeeklySalesDto(
+                    parkingLotUuid,
+                    parkingLotName,
+                    aggregatedSales
+                );
+                result.add(dto);
+            }
+        }
+        return result;
+    }
+
+    @Override
+    public List<ParkingLotWeeklySalesDto> getParkingLotsWeeklySalesByRange(String hostUuid, String startDate, String endDate) {
+        // 1. 주차장 목록을 DB에서 distinct로 추출
+        List<String> parkingLotUuids = dailySettlementRepository.findDistinctParkingLotUuidsByHostUuid(hostUuid);
+        List<ParkingLotWeeklySalesDto> result = new ArrayList<>();
+        java.time.LocalDate start = java.time.LocalDate.parse(startDate);
+        java.time.LocalDate end = java.time.LocalDate.parse(endDate);
+        for (String parkingLotUuid : parkingLotUuids) {
+            // 주차장명 조회
+            String parkingLotName = "";
+            try {
+                ParkingLotInfoResponseVo info = parkingLotInternalClient.getParkingLotInfo(parkingLotUuid);
+                parkingLotName = info != null ? info.getParkingLotName() : "";
+            } catch (Exception e) {
+                parkingLotName = "";
+            }
+            // 2. 각 주차장별로 일매출 조회 (날짜 범위)
+            List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndDateRange(
+                parkingLotUuid, start, end
+            );
+            // 3. 일매출 합산 로직
+            List<DailySalesResponseDto> aggregatedSales = aggregateDailySales(dailySales);
+            ParkingLotWeeklySalesDto dto = new ParkingLotWeeklySalesDto(
+                parkingLotUuid,
+                parkingLotName,
+                aggregatedSales
+            );
+            result.add(dto);
+        }
+        return result;
+    }
+    
+    @Override
+    public List<DailySalesResponseDto> getWeeklySalesByParkingLot(String hostUuid, String parkingLotUuid, int year, int week) {
+        // 주차장별 합산된 일매출 조회 (주별)
+        List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndYearWeek(parkingLotUuid, year, week);
+        return aggregateDailySales(dailySales);
+    }
+    
+    @Override
+    public List<DailySalesResponseDto> getWeeklySalesByParkingLotAndRange(String hostUuid, String parkingLotUuid, String startDate, String endDate) {
+        // 주차장별 합산된 일매출 조회 (날짜 범위)
+        LocalDate start = LocalDate.parse(startDate);
+        LocalDate end = LocalDate.parse(endDate);
+        List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndDateRange(parkingLotUuid, start, end);
+        return aggregateDailySales(dailySales);
+    }
+    
+    /**
+     * 일매출 합산 로직
+     */
+    private List<DailySalesResponseDto> aggregateDailySales(List<DailySalesResponseDto> dailySales) {
+        return dailySales.stream()
+                .collect(Collectors.groupingBy(
+                    DailySalesResponseDto::getDate
+                ))
+                .entrySet()
+                .stream()
+                .filter(e -> e.getKey() != null)
+                .map(e -> new DailySalesResponseDto(
+                    e.getKey(),
+                    e.getValue().stream()
+                        .map(dto -> new java.math.BigDecimal(dto.getAmount()))
+                        .reduce(java.math.BigDecimal.ZERO, java.math.BigDecimal::add)
+                ))
+                .sorted(java.util.Comparator.comparing(DailySalesResponseDto::getDate))
+                .collect(Collectors.toList());
     }
 }

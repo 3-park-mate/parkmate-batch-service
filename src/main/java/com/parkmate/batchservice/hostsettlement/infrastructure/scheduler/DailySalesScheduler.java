@@ -22,8 +22,8 @@ public class DailySalesScheduler {
     private final JobLauncher jobLauncher;
     private final Job dailySalesJob;
 
-    //@Scheduled(cron = "0 0 0 * * *") // 운영
-    @Scheduled(cron = "0 */1 * * * *") // 테스트
+    //@Scheduled(cron = "0 */1 * * * *") // 테스트
+    @Scheduled(cron = "0 */5 * * * *") // 5분마다 실행
     public void executeDailySettlementJob() {
         LocalDate today = LocalDate.now();
 

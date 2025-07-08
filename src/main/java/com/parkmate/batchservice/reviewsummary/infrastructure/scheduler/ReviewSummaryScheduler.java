@@ -17,7 +17,7 @@ public class ReviewSummaryScheduler {
     private final JobLauncher jobLauncher;
     private final Job reviewSummaryJob;
 
-    @Scheduled(fixedDelay = 60000)
+    @Scheduled(cron = "0 0 0 * * *") // 매일 자정에 실행
     public void runReviewSummaryJob() {
         try {
             JobParameters jobParameters = new JobParametersBuilder()
