@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 import java.util.ArrayList;
 import java.util.Comparator;
 import com.parkmate.batchservice.common.response.ApiResponse;
+import java.util.Map;
+import java.util.HashMap;
 
 @Slf4j
 @Service
@@ -218,6 +220,120 @@ public class HostSettlementServiceImpl implements HostSettlementService {
         return aggregateDailySales(dailySales);
     }
     
+    @Override
+    public List<ParkingLotSalesSummaryDto> getParkingLotSalesSummaryByRange(String hostUuid, String startDate, String endDate) {
+        List<String> parkingLotUuids = dailySettlementRepository.findDistinctParkingLotUuidsByHostUuid(hostUuid);
+        List<ParkingLotSalesSummaryDto> result = new ArrayList<>();
+        LocalDate start = LocalDate.parse(startDate);
+        LocalDate end = LocalDate.parse(endDate);
+        for (String parkingLotUuid : parkingLotUuids) {
+            // 주차장명 조회
+            String parkingLotName = "";
+            try {
+                ParkingLotInfoResponseVo info = parkingLotInternalClient.getParkingLotInfo(parkingLotUuid);
+                parkingLotName = info != null ? info.getParkingLotName() : "";
+            } catch (Exception e) {
+                parkingLotName = "";
+            }
+            // 해당 기간의 매출 합계
+            List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndDateRange(
+                parkingLotUuid, start, end
+            );
+            int weeklySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).sum();
+            // monthlySales는 0 또는 필요시 별도 계산
+            result.add(new ParkingLotSalesSummaryDto(parkingLotUuid, parkingLotName, 0, weeklySales));
+        }
+        return result;
+    }
+    
+    @Override
+    public List<ParkingLotSalesSummaryDto> getParkingLotSalesSummaryFlexible(String hostUuid, int year, Integer month, Integer weekOfMonth) {
+        // 1. 호스트가 관리하는 모든 주차장 UUID 리스트 조회
+        List<String> parkingLotUuids = dailySettlementRepository.findDistinctParkingLotUuidsByHostUuid(hostUuid);
+        Map<String, ParkingLotSalesSummaryDto> resultMap = new HashMap<>();
+
+        log.info("Flexible 호출 - year: {}, month: {}, weekOfMonth: {}, 주차장 수: {}", year, month, weekOfMonth, parkingLotUuids.size());
+
+        // 2. 각 주차장별로 주차장명 조회 및 초기화
+        for (String parkingLotUuid : parkingLotUuids) {
+            String parkingLotName = "";
+            try {
+                ParkingLotInfoResponseVo info = parkingLotInternalClient.getParkingLotInfo(parkingLotUuid);
+                parkingLotName = info != null ? info.getParkingLotName() : "";
+            } catch (Exception e) {
+                parkingLotName = "";
+            }
+            resultMap.put(parkingLotUuid, new ParkingLotSalesSummaryDto(parkingLotUuid, parkingLotName, 0, 0));
+        }
+
+        // 3. 월매출만 조회 (month만 있으면)
+        if (month != null && weekOfMonth == null) {
+            log.info("월매출만 조회 시작");
+            for (ParkingLotSalesSummaryDto dto : getParkingLotSalesSummary(hostUuid, year, month, null)) {
+                resultMap.compute(dto.getParkingLotUuid(), (k, v) -> {
+                    if (v != null) {
+                        return new ParkingLotSalesSummaryDto(v.getParkingLotUuid(), v.getParkingLotName(), dto.getMonthlySales(), 0);
+                    }
+                    return dto;
+                });
+            }
+            log.info("월매출만 조회 완료");
+        }
+        // 4. 주차매출만 조회 (weekOfMonth만 있으면)
+        else if (weekOfMonth != null && month == null) {
+            log.info("주차매출만 조회 시작 - weekOfMonth: {}", weekOfMonth);
+            // 주차매출만 조회하려면 month 정보가 필요하므로 에러 처리
+            log.warn("주차매출만 조회하려면 month 정보가 필요합니다");
+        }
+        // 5. 월매출 + 주차매출 동시 조회 (둘 다 있으면)
+        else if (month != null && weekOfMonth != null) {
+            log.info("월매출 + 주차매출 동시 조회 시작");
+            
+            // 월매출 조회
+            for (ParkingLotSalesSummaryDto dto : getParkingLotSalesSummary(hostUuid, year, month, null)) {
+                resultMap.compute(dto.getParkingLotUuid(), (k, v) -> {
+                    if (v != null) {
+                        return new ParkingLotSalesSummaryDto(v.getParkingLotUuid(), v.getParkingLotName(), dto.getMonthlySales(), v.getWeeklySales());
+                    }
+                    return dto;
+                });
+            }
+            
+            // 주차매출 조회
+            LocalDate[] range = getWeekRange(year, month, weekOfMonth);
+            if (range != null) {
+                List<ParkingLotSalesSummaryDto> weeklyResults = getParkingLotSalesSummaryByRange(hostUuid, range[0].toString(), range[1].toString());
+                for (ParkingLotSalesSummaryDto dto : weeklyResults) {
+                    resultMap.compute(dto.getParkingLotUuid(), (k, v) -> {
+                        if (v != null) {
+                            return new ParkingLotSalesSummaryDto(v.getParkingLotUuid(), v.getParkingLotName(), v.getMonthlySales(), dto.getWeeklySales());
+                        }
+                        return dto;
+                    });
+                }
+            }
+            log.info("월매출 + 주차매출 동시 조회 완료");
+        }
+
+        log.info("최종 결과 - {}건", resultMap.size());
+        return new ArrayList<>(resultMap.values());
+    }
+
+    /**
+     * 월의 n주차(1~5) 날짜 범위 계산 유틸리티
+     */
+    private LocalDate[] getWeekRange(int year, int month, int weekOfMonth) {
+        LocalDate start = LocalDate.of(year, month, 1);
+        int startDay = (weekOfMonth - 1) * 7 + 1;
+        int endDay = Math.min(weekOfMonth * 7, start.lengthOfMonth());
+        if (startDay > start.lengthOfMonth()) {
+            return null;
+        }
+        LocalDate weekStart = LocalDate.of(year, month, startDay);
+        LocalDate weekEnd = LocalDate.of(year, month, endDay);
+        return new LocalDate[]{weekStart, weekEnd};
+    }
+
     /**
      * 일매출 합산 로직
      */

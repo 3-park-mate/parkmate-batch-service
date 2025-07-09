@@ -57,4 +57,8 @@ public interface  HostSettlementService {
      * 특정 주차장의 합산된 일매출 조회 (날짜 범위)
      */
     List<DailySalesResponseDto> getWeeklySalesByParkingLotAndRange(String hostUuid, String parkingLotUuid, String startDate, String endDate);
+
+    List<ParkingLotSalesSummaryDto> getParkingLotSalesSummaryByRange(String hostUuid, String startDate, String endDate);
+
+    List<ParkingLotSalesSummaryDto> getParkingLotSalesSummaryFlexible(String hostUuid, int year, Integer month, Integer weekOfMonth);
 }
