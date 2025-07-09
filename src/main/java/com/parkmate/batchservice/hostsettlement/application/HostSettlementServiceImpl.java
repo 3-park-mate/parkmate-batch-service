@@ -419,49 +419,27 @@ public class HostSettlementServiceImpl implements HostSettlementService {
         int after = daysAfter != null ? daysAfter : 0;
         LocalDate start = base.minusDays(before);
         LocalDate end = base.plusDays(after);
-        String weekRangeStr = start.toString() + " ~ " + end.toString();
 
         // 주차장 목록 조회
         List<String> parkingLotUuids = dailySettlementRepository.findDistinctParkingLotUuidsByHostUuid(hostUuid);
         if (parkingLotUuids.isEmpty()) {
-            return null;
+            return new FlexibleWeeklyStatisticsDto(0);
         }
-        // 예시: 첫 번째 주차장만 반환 (여러 주차장 지원 필요시 List로 확장)
-        String parkingLotUuid = parkingLotUuids.get(0);
-        String parkingLotName = "";
-        try {
-            ParkingLotInfoResponseVo info = parkingLotInternalClient.getParkingLotInfo(parkingLotUuid);
-            parkingLotName = info != null ? info.getParkingLotName() : "";
-        } catch (Exception e) {
-            parkingLotName = "";
+        // 모든 주차장에 대해 주간 매출 합계 계산
+        int totalWeeklySales = 0;
+        for (String parkingLotUuid : parkingLotUuids) {
+            List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndDateRange(
+                parkingLotUuid, start, end
+            );
+            int lotSum = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).sum();
+            System.out.println("[매출집계] start: " + start + ", end: " + end + ", parkingLotUuid: " + parkingLotUuid);
+            System.out.println("[매출집계] dailySales.size(): " + dailySales.size() + ", lotSum: " + lotSum);
+            for (DailySalesResponseDto dto : dailySales) {
+                System.out.println("[매출집계] date: " + dto.getDate() + ", amount: " + dto.getAmount());
+            }
+            totalWeeklySales += lotSum;
         }
-        // 매출 데이터 조회
-        List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndDateRange(
-            parkingLotUuid, start, end
-        );
-        int totalWeeklySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).sum();
-        int totalDays = (int) start.until(end.plusDays(1), java.time.temporal.ChronoUnit.DAYS);
-        // 매출 발생 일수(고유 날짜 개수)
-        int salesDays = (int) dailySales.stream()
-            .map(DailySalesResponseDto::getDate)
-            .distinct()
-            .count();
-        double salesRate = totalDays > 0 ? (double) salesDays / totalDays : 0.0;
-        int maxDailySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).max().orElse(0);
-        int minDailySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).min().orElse(0);
-        int averageDailySales = totalDays > 0 ? totalWeeklySales / totalDays : 0;
-        return new FlexibleWeeklyStatisticsDto(
-            parkingLotUuid,
-            parkingLotName,
-            totalWeeklySales,
-            averageDailySales,
-            maxDailySales,
-            minDailySales,
-            totalDays,
-            salesDays,
-            salesRate,
-            weekRangeStr
-        );
+        return new FlexibleWeeklyStatisticsDto(totalWeeklySales);
     }
 
     /**
