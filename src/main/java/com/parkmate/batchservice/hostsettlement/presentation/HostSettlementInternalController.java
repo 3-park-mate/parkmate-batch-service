@@ -7,6 +7,7 @@ import com.parkmate.batchservice.hostsettlement.dto.response.feignforhost.DailyS
 import com.parkmate.batchservice.hostsettlement.dto.response.feignforhost.MonthlySalesResponseDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotSalesSummaryDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotWeeklySalesDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.FlexibleWeeklyStatisticsDto;
 import com.parkmate.batchservice.common.response.ApiResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -100,6 +101,17 @@ public class HostSettlementInternalController {
                 hostUuid, range[0].toString(), range[1].toString()
             )
         );
+    }
+
+    @GetMapping("/parking-lots/weekly-statistics-flexible")
+    public ApiResponse<FlexibleWeeklyStatisticsDto> getFlexibleWeeklyStatistics(
+            @RequestHeader("X-Host-UUID") String hostUuid,
+            @RequestParam("baseDate") String baseDate,
+            @RequestParam(value = "daysBefore", required = false) Integer daysBefore,
+            @RequestParam(value = "daysAfter", required = false) Integer daysAfter
+    ) {
+        FlexibleWeeklyStatisticsDto result = hostSettlementService.getFlexibleWeeklyStatistics(hostUuid, baseDate, daysBefore, daysAfter);
+        return ApiResponse.ok(result);
     }
 
     // 월의 n주차(1~5) 날짜 범위 계산 유틸리티
