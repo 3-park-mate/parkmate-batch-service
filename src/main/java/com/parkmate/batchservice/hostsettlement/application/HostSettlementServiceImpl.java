@@ -10,6 +10,8 @@ import com.parkmate.batchservice.hostsettlement.dto.response.feignforhost.Monthl
 import com.parkmate.batchservice.hostsettlement.dto.response.DailySalesSummaryDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotSalesSummaryDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotWeeklySalesDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.WeeklySalesStatisticsDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.FlexibleWeeklyStatisticsDto;
 import com.parkmate.batchservice.hostsettlement.infrastructure.repository.DailySettlementRepository;
 import com.parkmate.batchservice.hostsettlement.infrastructure.repository.MonthlySettlementRepository;
 import com.parkmate.batchservice.hostsettlement.vo.response.ParkingLotInfoResponseVo;
@@ -308,7 +310,7 @@ public class HostSettlementServiceImpl implements HostSettlementService {
                         if (v != null) {
                             return new ParkingLotSalesSummaryDto(v.getParkingLotUuid(), v.getParkingLotName(), v.getMonthlySales(), dto.getWeeklySales());
                         }
-                        return dto;
+                        return new ParkingLotSalesSummaryDto(dto.getParkingLotUuid(), dto.getParkingLotName(), 0, dto.getWeeklySales());
                     });
                 }
             }
@@ -317,6 +319,149 @@ public class HostSettlementServiceImpl implements HostSettlementService {
 
         log.info("최종 결과 - {}건", resultMap.size());
         return new ArrayList<>(resultMap.values());
+    }
+
+    /**
+     * 주간 매출 통계 조회
+     */
+    @Override
+    public List<WeeklySalesStatisticsDto> getWeeklySalesStatistics(String hostUuid, int year, int month, int weekOfMonth) {
+        List<String> parkingLotUuids = dailySettlementRepository.findDistinctParkingLotUuidsByHostUuid(hostUuid);
+        List<WeeklySalesStatisticsDto> result = new ArrayList<>();
+        
+        LocalDate[] range = getWeekRange(year, month, weekOfMonth);
+        if (range == null) {
+            log.warn("주차 범위 계산 실패 - year: {}, month: {}, weekOfMonth: {}", year, month, weekOfMonth);
+            return result;
+        }
+        
+        String weekRangeStr = range[0].toString() + " ~ " + range[1].toString();
+        
+        for (String parkingLotUuid : parkingLotUuids) {
+            // 주차장명 조회
+            String parkingLotName = "";
+            try {
+                ParkingLotInfoResponseVo info = parkingLotInternalClient.getParkingLotInfo(parkingLotUuid);
+                parkingLotName = info != null ? info.getParkingLotName() : "";
+            } catch (Exception e) {
+                parkingLotName = "";
+            }
+            
+            // 주간 매출 데이터 조회
+            List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndDateRange(
+                parkingLotUuid, range[0], range[1]
+            );
+            
+            // 통계 계산
+            int totalWeeklySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).sum();
+            int totalDays = (int) range[0].until(range[1].plusDays(1), java.time.temporal.ChronoUnit.DAYS);
+            int salesDays = dailySales.size();
+            double salesRate = totalDays > 0 ? (double) salesDays / totalDays : 0.0;
+            
+            int maxDailySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).max().orElse(0);
+            int minDailySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).min().orElse(0);
+            int averageDailySales = totalDays > 0 ? totalWeeklySales / totalDays : 0;
+            
+            WeeklySalesStatisticsDto statistics = new WeeklySalesStatisticsDto(
+                parkingLotUuid, parkingLotName, totalWeeklySales, averageDailySales,
+                maxDailySales, minDailySales, totalDays, salesDays, salesRate, weekRangeStr
+            );
+            
+            result.add(statistics);
+        }
+        
+        return result;
+    }
+
+    @Override
+    public List<WeeklySalesStatisticsDto> getWeeklySalesStatisticsByRange(String hostUuid, String startDate, String endDate) {
+        List<String> parkingLotUuids = dailySettlementRepository.findDistinctParkingLotUuidsByHostUuid(hostUuid);
+        List<WeeklySalesStatisticsDto> result = new ArrayList<>();
+        LocalDate start = LocalDate.parse(startDate);
+        LocalDate end = LocalDate.parse(endDate);
+        String weekRangeStr = start.toString() + " ~ " + end.toString();
+
+        for (String parkingLotUuid : parkingLotUuids) {
+            // 주차장명 조회
+            String parkingLotName = "";
+            try {
+                ParkingLotInfoResponseVo info = parkingLotInternalClient.getParkingLotInfo(parkingLotUuid);
+                parkingLotName = info != null ? info.getParkingLotName() : "";
+            } catch (Exception e) {
+                parkingLotName = "";
+            }
+            // 주간 매출 데이터 조회
+            List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndDateRange(
+                parkingLotUuid, start, end
+            );
+            // 통계 계산
+            int totalWeeklySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).sum();
+            int totalDays = (int) start.until(end.plusDays(1), java.time.temporal.ChronoUnit.DAYS);
+            int salesDays = dailySales.size();
+            double salesRate = totalDays > 0 ? (double) salesDays / totalDays : 0.0;
+            int maxDailySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).max().orElse(0);
+            int minDailySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).min().orElse(0);
+            int averageDailySales = totalDays > 0 ? totalWeeklySales / totalDays : 0;
+            WeeklySalesStatisticsDto statistics = new WeeklySalesStatisticsDto(
+                parkingLotUuid, parkingLotName, totalWeeklySales, averageDailySales,
+                maxDailySales, minDailySales, totalDays, salesDays, salesRate, weekRangeStr
+            );
+            result.add(statistics);
+        }
+        return result;
+    }
+
+    @Override
+    public FlexibleWeeklyStatisticsDto getFlexibleWeeklyStatistics(String hostUuid, String baseDate, Integer daysBefore, Integer daysAfter) {
+        // 날짜 범위 계산
+        LocalDate base = LocalDate.parse(baseDate);
+        int before = daysBefore != null ? daysBefore : 0;
+        int after = daysAfter != null ? daysAfter : 0;
+        LocalDate start = base.minusDays(before);
+        LocalDate end = base.plusDays(after);
+        String weekRangeStr = start.toString() + " ~ " + end.toString();
+
+        // 주차장 목록 조회
+        List<String> parkingLotUuids = dailySettlementRepository.findDistinctParkingLotUuidsByHostUuid(hostUuid);
+        if (parkingLotUuids.isEmpty()) {
+            return null;
+        }
+        // 예시: 첫 번째 주차장만 반환 (여러 주차장 지원 필요시 List로 확장)
+        String parkingLotUuid = parkingLotUuids.get(0);
+        String parkingLotName = "";
+        try {
+            ParkingLotInfoResponseVo info = parkingLotInternalClient.getParkingLotInfo(parkingLotUuid);
+            parkingLotName = info != null ? info.getParkingLotName() : "";
+        } catch (Exception e) {
+            parkingLotName = "";
+        }
+        // 매출 데이터 조회
+        List<DailySalesResponseDto> dailySales = dailySettlementRepository.findDailySalesByParkingLotAndDateRange(
+            parkingLotUuid, start, end
+        );
+        int totalWeeklySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).sum();
+        int totalDays = (int) start.until(end.plusDays(1), java.time.temporal.ChronoUnit.DAYS);
+        // 매출 발생 일수(고유 날짜 개수)
+        int salesDays = (int) dailySales.stream()
+            .map(DailySalesResponseDto::getDate)
+            .distinct()
+            .count();
+        double salesRate = totalDays > 0 ? (double) salesDays / totalDays : 0.0;
+        int maxDailySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).max().orElse(0);
+        int minDailySales = dailySales.stream().mapToInt(DailySalesResponseDto::getAmount).min().orElse(0);
+        int averageDailySales = totalDays > 0 ? totalWeeklySales / totalDays : 0;
+        return new FlexibleWeeklyStatisticsDto(
+            parkingLotUuid,
+            parkingLotName,
+            totalWeeklySales,
+            averageDailySales,
+            maxDailySales,
+            minDailySales,
+            totalDays,
+            salesDays,
+            salesRate,
+            weekRangeStr
+        );
     }
 
     /**

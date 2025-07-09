@@ -9,6 +9,8 @@ import com.parkmate.batchservice.kafka.event.ReservationEvent;
 import com.parkmate.batchservice.hostsettlement.dto.response.DailySalesSummaryDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotSalesSummaryDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotWeeklySalesDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.WeeklySalesStatisticsDto;
+import com.parkmate.batchservice.hostsettlement.dto.response.FlexibleWeeklyStatisticsDto;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
@@ -61,4 +63,19 @@ public interface  HostSettlementService {
     List<ParkingLotSalesSummaryDto> getParkingLotSalesSummaryByRange(String hostUuid, String startDate, String endDate);
 
     List<ParkingLotSalesSummaryDto> getParkingLotSalesSummaryFlexible(String hostUuid, int year, Integer month, Integer weekOfMonth);
+
+    /**
+     * 주간 매출 통계 조회
+     */
+    List<WeeklySalesStatisticsDto> getWeeklySalesStatistics(String hostUuid, int year, int month, int weekOfMonth);
+
+    /**
+     * 날짜 범위 기반 주간 매출 통계 조회
+     */
+    List<WeeklySalesStatisticsDto> getWeeklySalesStatisticsByRange(String hostUuid, String startDate, String endDate);
+
+    /**
+     * flexible 주간 매출 통계 조회
+     */
+    FlexibleWeeklyStatisticsDto getFlexibleWeeklyStatistics(String hostUuid, String baseDate, Integer daysBefore, Integer daysAfter);
 }
