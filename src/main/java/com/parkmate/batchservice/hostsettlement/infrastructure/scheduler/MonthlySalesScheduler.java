@@ -25,8 +25,7 @@ public class MonthlySalesScheduler {
     private final Job monthlySalesJob;
     private final HostSettlementService hostSettlementService;
 
-    //@Scheduled(cron = "0 0 0 * * *") // 매일 자정에 실행
-    @Scheduled(cron = "0 */5 * * * *") // 5분마다 실행
+    @Scheduled(cron = "0 0 0 * * *")
     public void triggerAllMonthlyJobs() {
         log.info("🚀 [정산 스케줄러] 월 정산 스케줄 시작");
         runMidMonthJob();
@@ -49,7 +48,6 @@ public class MonthlySalesScheduler {
         LocalDate startDate = getStartDate(currentMonth, cycle);
         LocalDate endDate = getEndDate(currentMonth, cycle);
 
-        // ✅ 변경된 부분: 정산 테이블에서 정산 대상 추출
         List<HostParkingLotDto> targets = hostSettlementService.extractMonthlyTargetsFromDB(currentMonth, cycle);
 
         if (targets.isEmpty()) {

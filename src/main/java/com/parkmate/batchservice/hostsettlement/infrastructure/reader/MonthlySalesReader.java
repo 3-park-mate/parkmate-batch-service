@@ -23,7 +23,7 @@ public class MonthlySalesReader implements ItemReader<List<DailySettlement>> {
         Map<String, List<DailySettlement>> grouped = settlements.stream()
                 .collect(Collectors.groupingBy(s -> s.getHostUuid() + "-" + s.getParkingLotUuid()));
         this.iterator = grouped.values().iterator();
-        log.info("✅ [MonthlySalesReader] 월매출 집계 기간 [{} ~ {}] 그룹 수: {}", startDate, endDate, grouped.size());
+        log.info(" [MonthlySalesReader] 월매출 집계 기간 [{} ~ {}] 그룹 수: {}", startDate, endDate, grouped.size());
     }
 
     @Override

@@ -11,6 +11,6 @@ import java.math.BigDecimal;
 @NoArgsConstructor
 @AllArgsConstructor
 public class MonthlySalesResponseDto {
-    private String yearMonth; // ex: "2025-06"
+    private String yearMonth;
     private BigDecimal totalSalesAmount;
 }
