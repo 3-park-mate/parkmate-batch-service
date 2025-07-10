@@ -2,7 +2,6 @@ package com.parkmate.batchservice.hostsettlement.presentation;
 
 import com.parkmate.batchservice.hostsettlement.application.HostSettlementService;
 import com.parkmate.batchservice.hostsettlement.domain.SettlementCycle;
-import com.parkmate.batchservice.hostsettlement.dto.response.DailySalesSummaryDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.feignforhost.DailySalesResponseDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.feignforhost.MonthlySalesResponseDto;
 import com.parkmate.batchservice.hostsettlement.dto.response.ParkingLotSalesSummaryDto;
@@ -70,9 +69,9 @@ public class HostSettlementInternalController {
             @RequestParam(value = "weekOfMonth", required = false) Integer weekOfMonth
     ) {
         return ApiResponse.ok(
-            hostSettlementService.getParkingLotSalesSummaryFlexible(
-                hostUuid, year, month, weekOfMonth
-            )
+                hostSettlementService.getParkingLotSalesSummaryFlexible(
+                        hostUuid, year, month, weekOfMonth
+                )
         );
     }
 
@@ -97,9 +96,9 @@ public class HostSettlementInternalController {
             return ApiResponse.ok(java.util.Collections.emptyList());
         }
         return ApiResponse.ok(
-            hostSettlementService.getParkingLotSalesSummaryByRange(
-                hostUuid, range[0].toString(), range[1].toString()
-            )
+                hostSettlementService.getParkingLotSalesSummaryByRange(
+                        hostUuid, range[0].toString(), range[1].toString()
+                )
         );
     }
 
@@ -114,7 +113,6 @@ public class HostSettlementInternalController {
         return ApiResponse.ok(result);
     }
 
-    // 월의 n주차(1~5) 날짜 범위 계산 유틸리티
     private LocalDate[] getWeekRange(int year, int month, int weekOfMonth) {
         LocalDate start = LocalDate.of(year, month, 1);
         int startDay = (weekOfMonth - 1) * 7 + 1;

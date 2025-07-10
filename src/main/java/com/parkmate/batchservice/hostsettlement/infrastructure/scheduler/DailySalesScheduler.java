@@ -22,8 +22,7 @@ public class DailySalesScheduler {
     private final JobLauncher jobLauncher;
     private final Job dailySalesJob;
 
-    //@Scheduled(cron = "0 */1 * * * *") // 테스트
-    @Scheduled(cron = "0 */5 * * * *") // 5분마다 실행
+    @Scheduled(cron = "0 0 0 * * *")
     public void executeDailySettlementJob() {
         LocalDate today = LocalDate.now();
 
@@ -31,8 +30,8 @@ public class DailySalesScheduler {
 
         try {
             JobParameters params = new JobParametersBuilder()
-                    .addString("jobDate", today.toString()) // 날짜 추가
-                    .addLong("run.id", System.currentTimeMillis()) // 중복 방지용
+                    .addString("jobDate", today.toString())
+                    .addLong("run.id", System.currentTimeMillis())
                     .toJobParameters();
 
             jobLauncher.run(dailySalesJob, params);
